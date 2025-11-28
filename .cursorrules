@@ -1,0 +1,571 @@
+# Cursor Rules for Bitcoin PSBT & BRC-20 Mint Portal
+
+## Project Context
+
+This is a **Next.js 16** application for minting BRC-20 tokens using **chained PSBTs** (1-25 mints in a single flow). The application is **100% client-side**, uses **bitcoinjs-lib** for PSBT construction, and integrates with multiple Bitcoin wallets via the **LaserEyes SDK** and custom adapters.
+
+**Critical**: This application handles **user funds**. All code must prioritize **security, clarity, and correctness** over cleverness.
+
+---
+
+## Core Architecture Principles
+
+### 1. Wallet Integration Pattern
+
+**ALWAYS** use the existing wallet adapter pattern:
+
+\`\`\`typescript
+// ✅ CORRECT: Use LaserEyes SDK as primary
+import { useLaserEyes } from "@/lib/lasereyes-wallet-provider"
+
+// ✅ CORRECT: Use unified wallet context
+import { useWallet } from "@/lib/wallet-provider"
+
+// ❌ WRONG: Direct wallet API access
+window.unisat.signPsbt() // Don't do this directly
+\`\`\`
+
+**Wallet Adapter Rules:**
+- All wallet interactions MUST go through `WalletAdapter` interface
+- Use `LaserEyesWalletProvider` as the primary wallet system
+- Custom adapters (Unisat, Xverse, OKX) are fallbacks
+- Always handle wallet connection errors gracefully
+- Never assume a wallet is installed - check with `isInstalled()` first
+
+### 2. PSBT Construction Pattern
+
+**ALWAYS** use `bitcoinjs-lib` for PSBT construction:
+
+\`\`\`typescript
+// ✅ CORRECT: Use BRC20PSBTBuilder
+import { BRC20PSBTBuilder } from "@/lib/brc20-psbt-builder"
+
+const builder = new BRC20PSBTBuilder(network)
+const psbtBase64 = await builder.buildMintPSBT(utxos, address, brc20Data, feeRate)
+
+// ❌ WRONG: Manual PSBT construction without proper types
+const psbt = new Psbt() // Missing network, wrong types
+\`\`\`
+
+**PSBT Rules:**
+- **ALWAYS** use `Uint8Array` for `witnessUtxo.script` (NOT `Buffer`)
+- **ALWAYS** use `BigInt` for `witnessUtxo.value` (NOT `number`)
+- **ALWAYS** preserve `scriptPubKey` from UTXO API responses
+- **ALWAYS** finalize PSBTs after signing: `psbt.finalizeAllInputs()`
+- **ALWAYS** validate PSBT structure before sending to wallet
+- **NEVER** create mock PSBTs - use real `bitcoinjs-lib` PSBTs
+
+### 3. UTXO Handling Pattern
+
+**ALWAYS** fetch UTXOs through the proper provider:
+
+\`\`\`typescript
+// ✅ CORRECT: Use UTXOProvider
+import { UTXOProvider } from "@/lib/utxo-provider"
+
+const utxos = await UTXOProvider.getUTXOs(address)
+
+// ✅ CORRECT: Use wallet's getUtxos method
+const utxos = await wallet.getUtxos()
+
+// ❌ WRONG: Direct API calls without provider
+fetch("/api/utxos") // Use provider abstraction
+\`\`\`
+
+**UTXO Rules:**
+- **ALWAYS** preserve `scriptPubKey` (or `scriptPk`) from API responses
+- **ALWAYS** validate UTXO structure before using in PSBTs
+- **ALWAYS** check for pending transactions before using UTXOs
+- **ALWAYS** handle UTXO format differences between APIs
+- **NEVER** assume UTXO format - validate with `UTXOValidator.validateUtxo()`
+
+### 4. Chained Minting Pattern
+
+**ALWAYS** use `ChainedMintBuilder` for multi-mint operations:
+
+\`\`\`typescript
+// ✅ CORRECT: Use ChainedMintBuilder
+import { ChainedMintBuilder } from "@/lib/brc20-mint"
+
+const result = await ChainedMintBuilder.buildChain({
+  ticker,
+  amounts,
+  receiverAddress,
+  userUtxos,
+  feeRate,
+  changeAddress
+})
+
+// ❌ WRONG: Manual chain building
+const psbt1 = buildPSBT() // Missing chain logic
+\`\`\`
+
+**Chained Mint Rules:**
+- **ALWAYS** use `ChainedMintBuilder.buildChain()` for 1-25 mints
+- **ALWAYS** update chained PSBTs with `updateChainedPSBT()` after previous tx confirms
+- **ALWAYS** track chain state with `MintChainState`
+- **ALWAYS** validate chain consistency before signing
+- **NEVER** build chained PSBTs manually - use the builder
+
+### 5. Fee Calculation Pattern
+
+**ALWAYS** use `FeeService` and `FeeCalculator`:
+
+\`\`\`typescript
+// ✅ CORRECT: Use FeeService
+import { FeeService } from "@/lib/fee-service"
+import { FeeCalculator } from "@/lib/brc20-mint"
+
+const fees = await FeeService.getFeeRates()
+const chainFees = FeeCalculator.calculateChainFees(utxoValue, chainLength, feeRate)
+
+// ❌ WRONG: Hardcoded fees
+const fee = 1000 // Don't hardcode
+\`\`\`
+
+**Fee Rules:**
+- **ALWAYS** fetch current fee rates from mempool.space
+- **ALWAYS** use `FeeCalculator` for chain fee calculations
+- **ALWAYS** validate fees are reasonable (< 50% of input value)
+- **ALWAYS** handle dust scenarios properly (330 sats minimum)
+- **NEVER** hardcode fee rates - always fetch dynamically
+
+---
+
+## TypeScript & Code Quality
+
+### Type Safety
+
+**ALWAYS** use strict TypeScript:
+
+\`\`\`typescript
+// ✅ CORRECT: Proper types
+interface ChainedMintParams {
+  ticker: string
+  amounts: string[]
+  receiverAddress: string
+  userUtxos: UTXO[]
+  feeRate: number
+  changeAddress: string
+}
+
+// ❌ WRONG: Any types
+const buildChain = (params: any) => { }
+\`\`\`
+
+**Type Rules:**
+- **ALWAYS** define interfaces for function parameters
+- **ALWAYS** use `UTXO` type from `@/lib/psbt/types`
+- **ALWAYS** use `ChainedPSBT` type for chain operations
+- **NEVER** use `any` - use `unknown` if type is truly unknown
+- **ALWAYS** validate types at runtime when receiving external data
+
+### Error Handling
+
+**ALWAYS** handle errors gracefully:
+
+\`\`\`typescript
+// ✅ CORRECT: Proper error handling
+try {
+  const result = await wallet.signPsbt(psbtBase64)
+} catch (error: unknown) {
+  const handled = handleError(error)
+  toast({
+    variant: "destructive",
+    title: handled.message,
+    description: handled.code
+  })
+}
+
+// ❌ WRONG: Silent failures
+try {
+  await wallet.signPsbt(psbtBase64)
+} catch {
+  // Silent failure - user doesn't know what happened
+}
+\`\`\`
+
+**Error Rules:**
+- **ALWAYS** use `handleError()` from `@/lib/error-handler`
+- **ALWAYS** show user-friendly error messages
+- **ALWAYS** log errors with `[v0]` prefix for debugging
+- **ALWAYS** handle wallet rejection gracefully (user cancelled)
+- **NEVER** expose sensitive data in error messages
+
+---
+
+## React & Next.js Patterns
+
+### Component Structure
+
+**ALWAYS** follow existing component patterns:
+
+\`\`\`typescript
+// ✅ CORRECT: Client component with proper hooks
+"use client"
+
+import { useWallet } from "@/lib/wallet-provider"
+import { useToast } from "@/hooks/use-toast"
+
+export function MintComponent() {
+  const wallet = useWallet()
+  const { toast } = useToast()
+  // ...
+}
+
+// ❌ WRONG: Server component accessing wallet
+export default function MintPage() {
+  const wallet = useWallet() // Won't work in server component
+}
+\`\`\`
+
+**Component Rules:**
+- **ALWAYS** use `"use client"` for wallet-interactive components
+- **ALWAYS** use `useWallet()` hook for wallet state
+- **ALWAYS** use `useToast()` for user feedback
+- **ALWAYS** handle loading states with proper UI
+- **NEVER** access `window` in server components
+
+### State Management
+
+**ALWAYS** use React Context for wallet state:
+
+\`\`\`typescript
+// ✅ CORRECT: Use wallet context
+const wallet = useWallet()
+
+if (!wallet.connected) {
+  return <ConnectWallet />
+}
+
+// ❌ WRONG: Local state for wallet
+const [address, setAddress] = useState() // Don't duplicate wallet state
+\`\`\`
+
+**State Rules:**
+- **ALWAYS** use `useWallet()` hook - don't duplicate wallet state
+- **ALWAYS** use `MintChainState` for chained mint state
+- **ALWAYS** use TanStack Query for server data (UTXOs, balances)
+- **NEVER** store sensitive data (private keys) in state
+- **ALWAYS** clear state on wallet disconnect
+
+---
+
+## Bitcoin & PSBT Specific Rules
+
+### Address Validation
+
+**ALWAYS** validate Bitcoin addresses:
+
+\`\`\`typescript
+// ✅ CORRECT: Use BRC20Builder validation
+import { BRC20Builder } from "@/lib/brc20-builder"
+
+const validation = BRC20Builder.validateAddress(address)
+if (!validation.valid) {
+  throw new Error(validation.error)
+}
+
+// ❌ WRONG: No validation
+const address = userInput // Could be invalid
+\`\`\`
+
+**Address Rules:**
+- **ALWAYS** validate addresses before using in PSBTs
+- **ALWAYS** support Taproot (bc1p...), SegWit (bc1...), and legacy formats
+- **ALWAYS** check network (mainnet vs testnet) matches address format
+- **NEVER** trust user input without validation
+
+### PSBT Validation
+
+**ALWAYS** validate PSBTs before signing:
+
+\`\`\`typescript
+// ✅ CORRECT: Validate before signing
+import { validatePsbtStructure } from "@/lib/psbt-utils"
+
+const validation = validatePsbtStructure(psbtBase64)
+if (!validation.valid) {
+  throw new Error(validation.errors.join(", "))
+}
+
+// ❌ WRONG: Sign without validation
+await wallet.signPsbt(psbtBase64) // Could be invalid
+\`\`\`
+
+**PSBT Validation Rules:**
+- **ALWAYS** validate PSBT structure before sending to wallet
+- **ALWAYS** check for mock PSBTs (JSON format) - reject them
+- **ALWAYS** validate inputs have proper `witnessUtxo` data
+- **ALWAYS** validate outputs have correct values
+- **ALWAYS** check fee is reasonable
+
+### Transaction Broadcasting
+
+**ALWAYS** handle broadcasting properly:
+
+\`\`\`typescript
+// ✅ CORRECT: Use Broadcaster or wallet broadcast
+import { Broadcaster } from "@/lib/broadcaster"
+
+const result = await Broadcaster.broadcast(txHex)
+// OR
+const result = await wallet.signPsbt(psbtBase64, true) // broadcast=true
+
+// ❌ WRONG: Direct API calls without error handling
+fetch("https://mempool.space/api/tx", { body: txHex })
+\`\`\`
+
+**Broadcast Rules:**
+- **ALWAYS** finalize PSBT before broadcasting
+- **ALWAYS** use `Broadcaster` class for fallback broadcasting
+- **ALWAYS** handle broadcast errors gracefully
+- **ALWAYS** verify transaction appears in mempool after broadcast
+- **NEVER** broadcast unfinalized PSBTs
+
+---
+
+## Security Guidelines
+
+### User Funds Protection
+
+**CRITICAL**: This application handles user funds. Follow these rules:
+
+1. **NEVER** store private keys or seeds
+2. **ALWAYS** validate all user inputs
+3. **ALWAYS** show transaction details before signing
+4. **ALWAYS** handle user rejection gracefully
+5. **ALWAYS** validate UTXO ownership before spending
+6. **ALWAYS** check for sufficient balance before building PSBTs
+7. **ALWAYS** validate fee calculations
+8. **NEVER** auto-sign transactions without user confirmation
+
+### PSBT Security
+
+**ALWAYS** follow PSBT security best practices:
+
+1. **ALWAYS** validate PSBT structure before signing
+2. **ALWAYS** show transaction summary to user before signing
+3. **ALWAYS** validate outputs match user expectations
+4. **ALWAYS** check for unexpected outputs or inputs
+5. **NEVER** sign PSBTs with placeholder data
+6. **NEVER** sign PSBTs without proper `witnessUtxo` data
+
+---
+
+## Code Style & Conventions
+
+### File Organization
+
+**ALWAYS** follow existing file structure:
+
+\`\`\`
+lib/
+  ├── wallets.ts              # Wallet adapters
+  ├── brc20-mint.ts           # Chained minting logic
+  ├── brc20-psbt-builder.ts  # PSBT construction
+  ├── fee-service.ts          # Fee calculations
+  ├── utxo-provider.ts        # UTXO fetching
+  └── psbt/                   # PSBT utilities
+      ├── core.ts
+      ├── types.ts
+      └── signer-interface.ts
+
+components/
+  ├── mint/                   # Mint-specific components
+  ├── wallet/                 # Wallet components
+  └── ui/                     # shadcn/ui components
+\`\`\`
+
+### Naming Conventions
+
+**ALWAYS** follow existing naming patterns:
+
+- **Classes**: PascalCase (`ChainedMintBuilder`, `FeeCalculator`)
+- **Functions**: camelCase (`buildChain`, `calculateFees`)
+- **Types/Interfaces**: PascalCase (`ChainedPSBT`, `UTXO`)
+- **Constants**: UPPER_SNAKE_CASE (`DUST_THRESHOLD`, `TAPROOT_INPUT_VSIZE`)
+- **Files**: kebab-case (`brc20-mint.ts`, `fee-service.ts`)
+
+### Logging
+
+**ALWAYS** use consistent logging:
+
+\`\`\`typescript
+// ✅ CORRECT: Use [brc20kit] prefix
+console.log("[brc20kit] Building PSBT chain...")
+console.error("[brc20kit] ❌ Failed to build chain:", error)
+console.warn("[brc20kit] ⚠️ Low fee rate detected")
+
+// ❌ WRONG: Inconsistent logging
+console.log("Building chain") // Missing prefix
+\`\`\`
+
+**Logging Rules:**
+- **ALWAYS** use `[v0]` prefix for all logs
+- **ALWAYS** use emojis for visual clarity (✅ ❌ ⚠️ 🔍 📝)
+- **ALWAYS** log errors with context
+- **NEVER** log sensitive data (private keys, seeds)
+- **NEVER** log full PSBTs (too large) - log summaries
+
+---
+
+## Testing & Validation
+
+### PSBT Validation
+
+**ALWAYS** validate PSBTs at multiple stages:
+
+1. **Before building**: Validate inputs (UTXOs, addresses, amounts)
+2. **After building**: Validate PSBT structure
+3. **Before signing**: Validate PSBT is complete and correct
+4. **After signing**: Validate transaction can be extracted
+5. **Before broadcast**: Validate transaction hex is valid
+
+### Error Recovery
+
+**ALWAYS** implement error recovery:
+
+\`\`\`typescript
+// ✅ CORRECT: Error recovery for chained mints
+const state = new MintChainState()
+try {
+  await signChain()
+} catch (error) {
+  const recovery = state.recoverFromInterruption(lastTxid)
+  if (recovery.canResume) {
+    // Resume from last confirmed transaction
+  }
+}
+\`\`\`
+
+**Recovery Rules:**
+- **ALWAYS** track chain state with `MintChainState`
+- **ALWAYS** allow resuming from last confirmed transaction
+- **ALWAYS** handle partial chain completion
+- **ALWAYS** validate remaining chain before resuming
+
+---
+
+## Dependencies & Libraries
+
+### Required Libraries
+
+**ALWAYS** use these specific libraries:
+
+- `bitcoinjs-lib`: For PSBT construction (latest)
+- `@omnisat/lasereyes`: For wallet integration (0.0.161)
+- `sats-connect`: For Xverse wallet (via LaserEyes)
+- `@tanstack/react-query`: For server state
+- `zod`: For validation schemas
+
+### Library Usage
+
+**ALWAYS** follow library-specific patterns:
+
+\`\`\`typescript
+// ✅ CORRECT: bitcoinjs-lib usage
+import * as bitcoin from "bitcoinjs-lib"
+
+const psbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+psbt.addInput({
+  hash: txid,
+  index: vout,
+  witnessUtxo: {
+    script: Uint8Array.from(Buffer.from(scriptPk, "hex")), // Uint8Array!
+    value: BigInt(value) // BigInt!
+  }
+})
+
+// ❌ WRONG: Incorrect types
+psbt.addInput({
+  witnessUtxo: {
+    script: Buffer.from(scriptPk, "hex"), // Should be Uint8Array
+    value: value // Should be BigInt
+  }
+})
+\`\`\`
+
+---
+
+## Common Mistakes to Avoid
+
+### ❌ DO NOT:
+
+1. **Use `Buffer` instead of `Uint8Array`** for `witnessUtxo.script`
+2. **Use `number` instead of `BigInt`** for `witnessUtxo.value`
+3. **Create mock PSBTs** - always use real `bitcoinjs-lib` PSBTs
+4. **Hardcode fee rates** - always fetch from mempool.space
+5. **Skip PSBT validation** - always validate before signing
+6. **Store private keys** - never store sensitive data
+7. **Access wallet APIs directly** - always use adapters
+8. **Build chained PSBTs manually** - use `ChainedMintBuilder`
+9. **Ignore UTXO `scriptPubKey`** - always preserve it
+10. **Sign without user confirmation** - always show transaction details
+
+### ✅ DO:
+
+1. **Use `Uint8Array` and `BigInt`** for PSBT construction
+2. **Validate all inputs** before building PSBTs
+3. **Use existing builders and services** (don't reinvent)
+4. **Handle errors gracefully** with user-friendly messages
+5. **Log with `[v0]` prefix** for debugging
+6. **Use TypeScript strictly** - no `any` types
+7. **Follow existing patterns** - adapter, builder, provider
+8. **Test on testnet** before mainnet
+9. **Preserve `scriptPubKey`** through entire flow
+10. **Finalize PSBTs** after signing before broadcast
+
+---
+
+## Quick Reference
+
+### Wallet Connection
+\`\`\`typescript
+const wallet = useWallet()
+await wallet.connect("unisat") // or "xverse", "okx"
+\`\`\`
+
+### Build PSBT Chain
+\`\`\`typescript
+const result = await ChainedMintBuilder.buildChain({
+  ticker: "ORDI",
+  amounts: ["1000", "1000", "1000"],
+  receiverAddress: wallet.address!,
+  userUtxos: await wallet.getUtxos(),
+  feeRate: 10,
+  changeAddress: wallet.address!
+})
+\`\`\`
+
+### Sign & Broadcast
+\`\`\`typescript
+const signResult = await wallet.signPsbt(psbtBase64, true) // broadcast=true
+\`\`\`
+
+### Fetch UTXOs
+\`\`\`typescript
+const utxos = await wallet.getUtxos()
+// OR
+const utxos = await UTXOProvider.getUTXOs(address)
+\`\`\`
+
+### Calculate Fees
+\`\`\`typescript
+const fees = await FeeService.getFeeRates()
+const chainFees = FeeCalculator.calculateChainFees(utxoValue, chainLength, feeRate)
+\`\`\`
+
+---
+
+## When in Doubt
+
+1. **Read existing code** - follow patterns in `lib/brc20-mint.ts` and `lib/brc20-psbt-builder.ts`
+2. **Check documentation** - see `docs/BRC20_PSBT_FLOW.md` and `docs/wallet-integration-guide.md`
+3. **Validate everything** - when handling user funds, validate twice
+4. **Test on testnet** - always test Bitcoin operations on testnet first
+5. **Ask questions** - if unsure about PSBT construction, ask before implementing
+
+---
+
+**Remember**: This application handles **real Bitcoin transactions** and **user funds**. Every line of code must be **secure, clear, and correct**. When in doubt, prioritize **safety over speed**.
