@@ -131,9 +131,7 @@ const DUST_THRESHOLD = 330
 // These constants are kept for backward compatibility but should be replaced
 const TAPROOT_INPUT_VSIZE = 57.5
 const TAPROOT_OUTPUT_VSIZE = 43
-const OP_RETURN_OUTPUT_VSIZE = 50 // Deprecated: Use PSBTSizeCalculator.calculateOpReturnSize()
 const BASE_TX_SIZE = 10.5
-const AVERAGE_MINT_SIZE = 150 // Deprecated: Use PSBTSizeCalculator.calculateChainedPSBTSize()
 
 const COMMISSION_WALLET_ADDRESS =
   process.env.COMMISSION_WALLET_ADDRESS || process.env.NEXT_PUBLIC_COMMISSION_WALLET_ADDRESS
