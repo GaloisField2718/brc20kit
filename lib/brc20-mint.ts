@@ -211,7 +211,7 @@ export class FeeCalculator {
   static calculateSingleMintFees(
     fundingUtxoValue: number,
     feeRateSatsPerVbyte: number,
-    ticker: string = "ORDI",
+    ticker: string = "OPQT",
     amount: string = "1000",
   ): FeeCalculationResult {
     // Use precise size calculation
@@ -257,7 +257,7 @@ export class FeeCalculator {
     initialUtxoValue: number,
     chainLength: number,
     feeRate: number,
-    ticker: string = "ORDI",
+    ticker: string = "OPQT",
     amount: string = "1000",
     inputType: "P2WPKH" | "P2TR" = "P2TR",
   ): ChainFeeResult {
@@ -1223,7 +1223,7 @@ export class ChainedMintBuilder {
     const inputType = PSBTSizeCalculator.detectType(utxo.address, utxo.scriptPk)
 
     // Extract ticker and amount from BRC-20 data
-    const ticker = brc20Data.tick || brc20Data.ticker || "ORDI"
+    const ticker = brc20Data.tick || brc20Data.ticker || "OPQT"
     const amount = brc20Data.amt || brc20Data.amount || "1000"
 
     const estimatedSize = PSBTSizeCalculator.calculateChainedPSBTSize({
