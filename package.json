@@ -1,8 +1,8 @@
 {
   "name": "brc20kit",
   "version": "1.0.0",
-  "license": "MIT",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
