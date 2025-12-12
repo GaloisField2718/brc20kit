@@ -19,9 +19,9 @@ Complete reference for all environment variables and configuration options.
 
 Bitcoin network to use.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_NETWORK=mainnet  # or testnet
-\`\`\`
+```
 
 **Values:**
 - `mainnet` - Production Bitcoin network
@@ -35,9 +35,9 @@ Pre-fill the mint form with default values. Users can still change these.
 
 Token ticker that appears by default.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_DEFAULT_TICKER=SATS
-\`\`\`
+```
 
 **Note:** 4-character tickers are reserved for standard BRC-20 tokens.
 
@@ -45,25 +45,25 @@ NEXT_PUBLIC_DEFAULT_TICKER=SATS
 
 Default mint amount per transaction.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_DEFAULT_AMOUNT=1000
-\`\`\`
+```
 
 ### `NEXT_PUBLIC_DEFAULT_FEE_RATE`
 
 Default fee rate in sat/vB (will be overridden by live mempool data).
 
-\`\`\`env
+```env
 NEXT_PUBLIC_DEFAULT_FEE_RATE=10
-\`\`\`
+```
 
 ### `NEXT_PUBLIC_DEFAULT_NUM_MINTS`
 
 Default number of mints (1-25).
 
-\`\`\`env
+```env
 NEXT_PUBLIC_DEFAULT_NUM_MINTS=1
-\`\`\`
+```
 
 ## Platform Fees
 
@@ -73,9 +73,9 @@ Configure platform fees collected on the **first mint only** of each chain.
 
 Your Bitcoin address for collecting fees.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_COMMISSION_WALLET_ADDRESS=bc1q...
-\`\`\`
+```
 
 **Supported address types:**
 - P2WPKH (bc1q...) - **Recommended**
@@ -91,9 +91,9 @@ NEXT_PUBLIC_COMMISSION_WALLET_ADDRESS=bc1q...
 
 Commission amount in BTC.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_COMMISSION_AMOUNT_BTC=0.00000330  # 330 sats
-\`\`\`
+```
 
 **Recommended amounts:**
 - 330 sats (0.00000330 BTC) - Standard
@@ -106,9 +106,9 @@ NEXT_PUBLIC_COMMISSION_AMOUNT_BTC=0.00000330  # 330 sats
 
 ScriptPubKey in hex format. **Required for Taproot (bc1p...) addresses only.**
 
-\`\`\`env
+```env
 COMMISSION_SCRIPT_PUBKEY=512014a3b2c1...
-\`\`\`
+```
 
 Get this from:
 - Block explorer (decode your address)
@@ -122,9 +122,9 @@ Customize your portal's appearance.
 
 Project name displayed in header and metadata.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_PROJECT_NAME=MyMintPortal
-\`\`\`
+```
 
 Default: `BRC-20 Kit`
 
@@ -132,9 +132,9 @@ Default: `BRC-20 Kit`
 
 URL to your logo (light mode).
 
-\`\`\`env
+```env
 NEXT_PUBLIC_LOGO_URL=https://yoursite.com/logo.svg
-\`\`\`
+```
 
 Supports: SVG, PNG, JPG
 
@@ -142,9 +142,9 @@ Supports: SVG, PNG, JPG
 
 URL to your logo for dark mode (optional - uses `LOGO_URL` if not set).
 
-\`\`\`env
+```env
 NEXT_PUBLIC_LOGO_DARK_URL=https://yoursite.com/logo-dark.svg
-\`\`\`
+```
 
 ## API Configuration
 
@@ -152,9 +152,9 @@ NEXT_PUBLIC_LOGO_DARK_URL=https://yoursite.com/logo-dark.svg
 
 Simplicity API endpoint for UTXO fetching.
 
-\`\`\`env
+```env
 NEXT_PUBLIC_SIMPLICITY_API_URL=https://api.simplicity.network
-\`\`\`
+```
 
 Default: `https://api.simplicity.network`
 
@@ -162,30 +162,30 @@ Default: `https://api.simplicity.network`
 
 API secret for Simplicity (server-side only).
 
-\`\`\`env
+```env
 SIMPLICITY_API_SECRET=your_secret_here
-\`\`\`
+```
 
 ### `BITCOIN_RPC_URL` (Optional)
 
 Bitcoin RPC URL for advanced features.
 
-\`\`\`env
+```env
 BITCOIN_RPC_URL=https://your-rpc-node.com
-\`\`\`
+```
 
 ## Configuration Examples
 
 ### Example 1: Basic Setup (No Fees)
 
-\`\`\`env
+```env
 NEXT_PUBLIC_NETWORK=mainnet
 NEXT_PUBLIC_PROJECT_NAME=MyBRC20Portal
-\`\`\`
+```
 
 ### Example 2: With Platform Fees
 
-\`\`\`env
+```env
 NEXT_PUBLIC_NETWORK=mainnet
 NEXT_PUBLIC_PROJECT_NAME=PremiumMints
 
@@ -197,11 +197,11 @@ NEXT_PUBLIC_COMMISSION_AMOUNT_BTC=0.00000500
 NEXT_PUBLIC_DEFAULT_TICKER=PREMIUM
 NEXT_PUBLIC_DEFAULT_AMOUNT=5000
 NEXT_PUBLIC_DEFAULT_NUM_MINTS=5
-\`\`\`
+```
 
 ### Example 3: Full Customization
 
-\`\`\`env
+```env
 # Network
 NEXT_PUBLIC_NETWORK=mainnet
 
@@ -223,30 +223,30 @@ NEXT_PUBLIC_DEFAULT_NUM_MINTS=10
 # API
 NEXT_PUBLIC_SIMPLICITY_API_URL=https://api.simplicity.network
 SIMPLICITY_API_SECRET=your_secret_here
-\`\`\`
+```
 
 ## Validation & Debugging
 
 The configuration system includes automatic validation:
 
-\`\`\`typescript
+```typescript
 // In lib/config.ts
 export const tokenConfig = loadTokenConfig()
 export function isPlatformFeesEnabled(): boolean
 export function getPlatformFeesInfo(): { enabled, address, amountSats, amountBTC }
-\`\`\`
+```
 
 **Development Mode:**
 
 In development, configuration details are logged to the console:
 
-\`\`\`
+```
 [TokenConfig] Configuration loaded:
   - Network: mainnet
   - Fees address: bc1q... (330 sats)
   - Default ticker: SATS
   - ...
-\`\`\`
+```
 
 **Common Warnings:**
 
@@ -256,7 +256,7 @@ In development, configuration details are logged to the console:
 
 ## Accessing Configuration in Code
 
-\`\`\`typescript
+```typescript
 import { tokenConfig, isPlatformFeesEnabled, getPlatformFeesInfo } from '@/lib/config'
 
 // Access defaults
@@ -268,25 +268,25 @@ if (isPlatformFeesEnabled()) {
   const fees = getPlatformFeesInfo()
   console.log(`Fees: ${fees.amountSats} sats to ${fees.address}`)
 }
-\`\`\`
+```
 
 ## Security Best Practices
 
 1. **Use server-side variables for sensitive data:**
-   \`\`\`env
+   ```env
    SIMPLICITY_API_SECRET=secret  # No NEXT_PUBLIC_ prefix
    BITCOIN_RPC_URL=https://...   # No NEXT_PUBLIC_ prefix
-   \`\`\`
+   ```
 
 2. **Public transparency (optional):**
-   \`\`\`env
+   ```env
    NEXT_PUBLIC_COMMISSION_WALLET_ADDRESS=bc1q...  # Visible to users
-   \`\`\`
+   ```
 
 3. **Private fees (alternative):**
-   \`\`\`env
+   ```env
    COMMISSION_WALLET_ADDRESS=bc1q...  # Hidden from browser
-   \`\`\`
+   ```
 
 ## Troubleshooting
 
